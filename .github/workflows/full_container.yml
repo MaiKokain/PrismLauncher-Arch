@@ -1,0 +1,48 @@
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: update package n install git
+        run: |
+          pacman -Svyu --noconfirm
+          pacman -S git cmake extra-cmake-modules gamemode ghc-filesystem jdk17-openjdk scdoc cmark gcc-libs glibc hicolor-icon-theme libgl qt6-5compat qt6-base qt6-imageformats qt6-networkauth ninja qt6-svg quazip-qt6 tomlplusplus zlib clang tar pkgconf --noconfirm
+      - name: checkout prismlauncher source n prepare
+        run: |
+          git clone https://github.com/PrismLauncher/PrismLauncher.git
+          git clone https://github.com/PrismLauncher/libnbtplusplus.git
+
+          cd "PrismLauncher"
+          git submodule init
+          git config submodule.libraries/cmark.active false
+          git config submodule.libraries/extra-cmake-modules.active false
+          git config submodule.libraries/filesystem.active false
+          git config submodule.libraries/libnbtplusplus.url "../libnbtplusplus"
+          git config submodule.libraries/quazip.active false
+          git config submodule.libraries/tomlplusplus.active false
+          git config submodule.libraries/zlib.active false
+          git -c protocol.file.allow=always submodule update
+
+      - name: build
+        run: |
+          export PATH="/usr/lib/jvm/java-17-openjdk/bin:$PATH"
+
+          cmake -S PrismLauncher -B build -G Ninja -DCMAKE_BUILD_TYPE='None' -DCMAKE_INSTALL_PREFIX='PrismLauncher-portable' -DLauncher_BUILD_PLATFORM='archlinux' -DLauncher_QT_VERSION_MAJOR='6' -Wno-dev -DINSTALL_BUNDLE=full
+
+          cmake --build build
+
+          cmake --install build
+          cmake --install build --component portable
+      - name: idk get commit hash or sth
+        run: |
+          cd "PrismLauncher"
+          echo 'PATH_COMMIT_HASH_LOLL='$(git rev-parse HEAD) >> $GITHUB_ENV
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          path: PrismLauncher-portable
+          name: PrismLauncher-${{ env.PATH_COMMIT_HASH_LOLL }}
